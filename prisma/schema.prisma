@@ -1,0 +1,79 @@
+// Prisma schema for BU Examination QR Masking System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+  MARKER
+}
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+
+  claimedCodes AnonCode[]
+  markEntries  MarkEntry[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model ExamSession {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseName String
+  date       DateTime
+  duration   Int      @default(180) // duration in minutes
+  createdAt  DateTime @default(now())
+
+  anonCodes   AnonCode[]
+  markEntries MarkEntry[]
+
+  @@index([date])
+}
+
+model AnonCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeValue  String    @unique
+  examId     String    @db.Uuid
+  assignedTo String?   @db.Uuid
+  assignedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  exam       ExamSession  @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student    User?        @relation(fields: [assignedTo], references: [id], onDelete: SetNull)
+  markEntry  MarkEntry?
+
+  @@index([examId])
+  @@index([assignedTo])
+  @@index([codeValue])
+}
+
+model MarkEntry {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  examId    String   @db.Uuid
+  codeId    String   @unique @db.Uuid
+  score     Float
+  markerId  String   @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exam   ExamSession @relation(fields: [examId], references: [id], onDelete: Cascade)
+  code   AnonCode    @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  marker User        @relation(fields: [markerId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([codeId])
+  @@index([markerId])
+}
